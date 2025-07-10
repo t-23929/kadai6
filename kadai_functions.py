@@ -46,7 +46,7 @@ def country_trendline(country_name):
         tuple: A tuple containing the slope and R-squared value of the trendline.
     """
     df = process_sdg_data(
-        "../data/SG_GEN_PARL.xlsx",
+        "SG_GEN_PARL.xlsx",
         [
             "Goal",
             "Target",
@@ -66,7 +66,7 @@ def country_trendline(country_name):
 
 def generate_image(country_name):
     df = process_sdg_data(
-        "../data/SG_GEN_PARL.xlsx",
+        "SG_GEN_PARL.xlsx",
             [
             "Goal",
             "Target",
