@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
-from kadai_functions import fit_trendline, country_trendline, generate_image
+from kadai_functions import fit_trendline, country_trendline, generate_image, process_sdg_data
 from fastapi.responses import FileResponse
 import os
 
@@ -43,8 +43,31 @@ def calculate_country_trendline(country: str):
 def generate_country_image(country: str):
     IMAGE_PATH = generate_image(country)
     #IMAGE_PATH = country+".png"
-    print(IMAGE_PATH)
+    print(IMAGE_PATH)#デバック用のプリントコマンド
     if os.path.exists(IMAGE_PATH):
-        return FileResponse(IMAGE_PATH, media_type="image/png")
+        return FileResponse(IMAGE_PATH, media_type="image/png")#
     else:
         return {"error": "画像生成に失敗しました"}
+
+_cached_df = None
+
+def load_data():
+    global _cached_df
+    _cached_df = process_sdg_data()
+
+def get_cached_df():
+    global _cached_df
+    if _cached_df is None:
+        load_data()
+    return _cached_df
+
+@app.on_event("startup")
+def startup_event():
+    load_data()
+
+@app.get("/available_countries", summary="利用可能な国名リストを取得")
+def get_countries():
+    df = get_cached_df()
+    countries = list(df.columns)
+    return {"countries": countries}
+

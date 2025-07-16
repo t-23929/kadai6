@@ -1,7 +1,9 @@
-import pandas as pd
-from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from fastapi import HTTPException
+from scipy.stats import linregress
+
 
 def fit_trendline(year_timestamps, data):
     """Fits a trendline to the given data using linear regression.
@@ -16,11 +18,11 @@ def fit_trendline(year_timestamps, data):
     result = linregress(year_timestamps, data)
     slope = round(result.slope, 3)
     r_squared = round(result.rvalue**2, 3)
-    intercept = round(result.intercept,3)
+    intercept = round(result.intercept, 3)
     return slope, r_squared, intercept
 
 
-def process_sdg_data(input_excel_file, columns_to_drop):
+def process_sdg_data(input_excel_file="SG_GEN_PARL.xlsx", columns_to_drop=None):
     """Process SDG data from an input Excel file downloaded from the SDG website.
 
     Args:
@@ -30,6 +32,19 @@ def process_sdg_data(input_excel_file, columns_to_drop):
     Returns:
         pandas DataFrame: The processed DataFrame with dropped columns and transposed index.
     """
+    if columns_to_drop is None:
+        columns_to_drop = [
+            "Goal",
+            "Target",
+            "Indicator",
+            "SeriesCode",
+            "SeriesDescription",
+            "GeoAreaCode",
+            "Reporting Type",
+            "Sex",
+            "Units",
+        ]
+
     df = pd.read_excel(input_excel_file)
     df = df.drop(columns_to_drop, axis=1)
     df = df.set_index("GeoAreaName").transpose()
@@ -45,64 +60,52 @@ def country_trendline(country_name):
     Returns:
         tuple: A tuple containing the slope and R-squared value of the trendline.
     """
-    df = process_sdg_data(
-        "SG_GEN_PARL.xlsx",
-        [
-            "Goal",
-            "Target",
-            "Indicator",
-            "SeriesCode",
-            "SeriesDescription",
-            "GeoAreaCode",
-            "Reporting Type",
-            "Sex",
-            "Units",
-        ],
-    )
+    df = process_sdg_data()
+
+    if country_name not in df.columns:
+        raise HTTPException(
+            status_code=404,
+            detail=f"指定された国名 '{country_name}' はデータに存在しません。",
+        )
+
     timestamps = [int(i) for i in df.index.tolist()]
     country_data = df[country_name].tolist()
-    slope, r_squared, intercept  = fit_trendline(timestamps, country_data)
+    slope, r_squared, intercept = fit_trendline(timestamps, country_data)
     return slope, r_squared, intercept
 
+
 def generate_image(country_name):
-    df = process_sdg_data(
-        "SG_GEN_PARL.xlsx",
-            [
-            "Goal",
-            "Target",
-            "Indicator",
-            "SeriesCode",
-            "SeriesDescription",
-            "GeoAreaCode",
-            "Reporting Type",
-            "Sex",
-            "Units",
-            ],
-    )
+    df = process_sdg_data()
+
+    if country_name not in df.columns:
+        raise HTTPException(
+            status_code=404,
+            detail=f"指定された国名 '{country_name}' はデータに存在しません。",
+        )
 
     import matplotlib
-    matplotlib.use('Agg')
+
+    matplotlib.use("Agg")
     plt.clf()
 
     ## First Graph
     timestamps = [int(i) for i in df.index.tolist()]
     country_data = df[country_name].tolist()
-    plt.plot(timestamps, country_data, color='blue', label='Data')  
+    plt.plot(timestamps, country_data, color="blue", label="Data")
 
     ## Second Graph
-    a,b,c  = fit_trendline(timestamps, country_data)
-    x = np.linspace(timestamps[0], timestamps[-1], 100) 
-    y = a * x + c
-    plt.plot(x, y, label=f'y = {a}x + {c}', color='red')  
+    slope, r_squared, intercept = fit_trendline(timestamps, country_data)
+    x = np.linspace(timestamps[0], timestamps[-1], 100)
+    y = slope * x + intercept
+    plt.plot(x, y, label=f"y = {slope}x + {intercept}", color="red")
 
-    plt.xlabel('year')
-    plt.ylabel('percent')
+    plt.xlabel("year")
+    plt.ylabel("percent")
     plt.grid(True)
-    plt.title(country_name + ': Data Plot with Linear Regression')
-    plt.savefig(country_name+".png", dpi=300, bbox_inches='tight')
-    #plt.show()
-    return country_name+".png"
-
-#generate_image("India")
+    plt.title(country_name + ": Data Plot with Linear Regression")
+    plt.savefig(country_name + ".png", dpi=300, bbox_inches="tight")
+    # plt.show()　サーバー上で動いているから画面にはない
+    return country_name + ".png"
 
 
+# generate_image("India")
